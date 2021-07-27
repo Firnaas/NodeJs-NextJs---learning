@@ -1,10 +1,13 @@
-import { Controller, Post, Body, Get, Patch, Param, Query, Delete, NotFoundException, UseInterceptors, ClassSerializerInterceptor } from '@nestjs/common';
+import { Controller, Post, Body, Get, Patch, Param, Query, Delete, NotFoundException, Session, UseGuards } from '@nestjs/common';
 import { createUserDto } from './dtos/create-user.dto';
 import { updateUserDto } from './dtos/update-user.dto';
 import { UsersService } from './users.service';
 import { Serialize } from 'src/interceptors/serialize.interceptor';
 import { UserDto } from './dtos/user.dto';
 import { AuthService } from './auth.service';
+import { CurrentUser } from './decorator/current-user.decorator';
+import { User } from './users.entity';
+import { AuthGuard } from 'src/Guards/auth.guard';
 
 @Controller('auth')
 @Serialize(UserDto)
@@ -14,14 +17,34 @@ export class UsersController {
         private auth: AuthService
     ) {}
 
+    // @Get('/whoami')
+    // WhoAmI(@Session() session:any) {
+    //     return this.userService.findOne(session.userId)
+    // }
+
+    @Get('/whoami')
+    @UseGuards(AuthGuard)
+    WhoAmI(@CurrentUser() user: User) {
+        return user;
+    }
+
     @Post('/signup')
-    createUser(@Body() body: createUserDto) {
-        return this.auth.signup(body.email, body.password);
+    async createUser(@Body() body: createUserDto, @Session() session: any) {
+        const user = await this.auth.signup(body.email, body.password);
+        session.userId = user.id;
+        return user;
+    }
+
+    @Post('/signout')
+    signOut(@Session() session: any) {
+        session.userId = null;
     }
 
     @Post('/signin')
-    signIn(@Body() body: createUserDto) {
-        return this.auth.signIn(body.email, body.password);
+    async signIn(@Body() body: createUserDto, @Session() session: any) {
+        const user = await this.auth.signIn(body.email, body.password);
+        session.userId = user.id;
+        return user;
     }
 
     @Get('/:id')
@@ -47,5 +70,4 @@ export class UsersController {
     updateUser(@Param('id') id: string, @Body() body: updateUserDto) {
         return this.userService.update(parseInt(id), body)
     }
-
 }
